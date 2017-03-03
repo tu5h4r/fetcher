@@ -116,21 +116,23 @@ func getJSON(url string) {
 		case tokenType == html.EndTagToken:
 			t := doc.Token()
 			if t.Data == "p" && readquestion == true {
-				if recordCode == false {
+				//if recordCode == false {
 					fmt.Println("")
-				}
+				//}
 				readquestion = false
-				recordahref = false
+				//recordahref = false
 			}
 			if t.Data == "code" && recordSpanEntry == true {
 				recordCode = false
 				break
 			}
-
 			if t.Data == "li" && recordliquestion == true {
 				fmt.Println("\n*************************************")
 				recordSpanEntry = false
 				recordliquestion = false
+			}
+			if t.Data == "a" && recordSpanEntry == true {
+				recordahref = false
 			}
 		}
 	}
