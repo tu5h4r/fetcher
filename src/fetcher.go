@@ -40,15 +40,20 @@ var myClient = &http.Client{Timeout: 100 * time.Second}
 
 //Make a generic parseBlock function where you pass *html.Tokenizer and a JSON with HTML block structure, tokenizer is passed as reference
 
-func getJSON(url string,companyName string, pageID string) []QuestionEntry {
-	//var compQuestions CompanyQuestions
+func getJSON(url string,companyName string, pageID string, chFinished chan bool,  ret chan []QuestionEntry)  {
+
 	link := "https://www.careercup.com/page?pid=" + companyName + "-interview-questions&n=" + pageID
 	fmt.Println(link)
 	resp, err := myClient.Get(link)
 	if err != nil {
 		log.Fatal(err)
-		return nil
+		return //nil
 	}
+
+	defer func() {
+		// Notify that we're done after this function
+		chFinished <- true
+	}()
 
 	defer resp.Body.Close()
 	doc := html.NewTokenizer(resp.Body)
@@ -180,27 +185,33 @@ func getJSON(url string,companyName string, pageID string) []QuestionEntry {
 			}
 		}
 	}
-    //var sq []SiteQuestions
-	//sq  = append(sq,SiteQuestions {Site:"careercup",QuestionEntrySet:questionArray})
-	//compQuestions = CompanyQuestions{Company : companyName,SiteQuestionsSet : sq}
-	//return compQuestions
-	return questionArray
-}
 
-//func getQuestions(company string, )
+	ret <- questionArray
+}
 
 func main() {
 	var cmpqs []CompanyQuestions
 	var stqs []SiteQuestions
 	var qsarr []QuestionEntry
-	
-	for i := 1;i <= 14; i++ {
-		compq := getJSON("https://www.careercup.com", "google",strconv.Itoa(i))
-		qsarr = append(qsarr,compq...)
-		//cmpqs["google"] = append(cmpqs["google"],compq)
+	compq := make(chan []QuestionEntry)
+	chFinished := make(chan bool)	
+
+	for i := 1;i <= 14; i++ {  
+		go getJSON("https://www.careercup.com", "google",strconv.Itoa(i),chFinished,compq)		
 	}
+
+	for c := 1; c <= 14; {
+		select {
+		case ret := <-compq:
+			qsarr = append(qsarr,ret...)
+		case <-chFinished:
+			c++
+		}
+	}
+	
 	stqs = append(stqs, SiteQuestions{"careercup",qsarr})
 	cmpqs = append(cmpqs,CompanyQuestions{"google",stqs})
-	b, _ := json.MarshalIndent(cmpqs,"","  ")				
+	b, _ := json.MarshalIndent(cmpqs,"","  ")		
+
 	fmt.Println("\n" + string(b))
 }
