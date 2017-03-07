@@ -7,17 +7,47 @@ import (
 	"strings"
 	"time"
 	"golang.org/x/net/html"
+	"encoding/json"
+	"strconv"
 )
 
-var myClient = &http.Client{Timeout: 10 * time.Second}
+//Singular question entry
+type QuestionEntry struct {
+    ID  string
+    Votes string
+    Comments  string
+	URL string
+	Date string
+    Question string
+	//Company string
+	//Site string
+}
+
+//Per site collection of questions for a given company
+type SiteQuestions struct {
+	Site string // site name
+	QuestionEntrySet []QuestionEntry
+}
+
+//Per company collection of questions across different sites
+type CompanyQuestions struct {
+	Company string
+	SiteQuestionsSet []SiteQuestions
+}
+
+
+var myClient = &http.Client{Timeout: 100 * time.Second}
 
 //Make a generic parseBlock function where you pass *html.Tokenizer and a JSON with HTML block structure, tokenizer is passed as reference
 
-func getJSON(url string) {
-	resp, err := myClient.Get(url)
+func getJSON(url string,companyName string, pageID string) []QuestionEntry {
+	//var compQuestions CompanyQuestions
+	link := "https://www.careercup.com/page?pid=" + companyName + "-interview-questions&n=" + pageID
+	fmt.Println(link)
+	resp, err := myClient.Get(link)
 	if err != nil {
 		log.Fatal(err)
-		return
+		return nil
 	}
 
 	defer resp.Body.Close()
@@ -29,6 +59,10 @@ func getJSON(url string) {
 	recordahref := false      //Link to question
 	readquestion := false     //Question text
 	recordCode := false       //Code snippet
+	var qEntry QuestionEntry
+	var questionText string
+	var questionArray []QuestionEntry
+
 	for tokenType := doc.Next(); tokenType != html.ErrorToken; tokenType = doc.Next() {
 		switch {
 		case tokenType == html.StartTagToken:
@@ -73,14 +107,24 @@ func getJSON(url string) {
 				for _, a := range t.Attr {
 					if a.Key == "href" && strings.HasPrefix(a.Val, "/question?id=") {
 						recordahref = true
-						fmt.Println("URL: " + strings.Split(url, ".com")[0] + ".com" + a.Val)
-						fmt.Println("ID: " + strings.TrimLeft(a.Val, "/question?id="))
-						fmt.Println("Question:")
+						qEntry.URL = strings.Split(url, ".com")[0] + ".com" + a.Val
+						qEntry.ID = strings.TrimLeft(a.Val, "/question?id=")
 						break
 					}
 				}
 				break
 			}
+
+			if t.Data == "abbr" && recordSpanEntry == true {
+				for _, a := range t.Attr {
+					if a.Key == "title" {
+						qEntry.Date = a.Val
+						break
+					}
+				}
+				break
+			}
+
 
 			if t.Data == "p" && recordSpanEntry == true && recordahref == true {
 				readquestion = true
@@ -93,22 +137,23 @@ func getJSON(url string) {
 			}
 
 			if t.Data == "br" && recordSpanEntry == true && recordahref == true && readquestion == true {
+				questionText += "\n"
 				break
 			}
 
 		case tokenType == html.TextToken:
 			t := doc.Token()
 			if readquestion == true || recordCode == true {
-				fmt.Print(t.Data)
+				questionText += t.Data
 				break
 			}
 			if recordVote == true {
-				fmt.Println("Votes: " + t.Data)
+				qEntry.Votes = t.Data
 				recordVote = false
 				break
 			}
 			if recordRating == true {
-				fmt.Println("Comments: " + t.Data)
+				qEntry.Comments = t.Data
 				recordRating = false
 				break
 			}
@@ -116,18 +161,17 @@ func getJSON(url string) {
 		case tokenType == html.EndTagToken:
 			t := doc.Token()
 			if t.Data == "p" && readquestion == true {
-				//if recordCode == false {
-					fmt.Println("")
-				//}
+				questionText += "\n"
 				readquestion = false
-				//recordahref = false
 			}
 			if t.Data == "code" && recordSpanEntry == true {
 				recordCode = false
 				break
 			}
 			if t.Data == "li" && recordliquestion == true {
-				fmt.Println("\n*************************************")
+				qEntry.Question = questionText
+				questionText = ""
+				questionArray = append(questionArray, qEntry)
 				recordSpanEntry = false
 				recordliquestion = false
 			}
@@ -136,8 +180,27 @@ func getJSON(url string) {
 			}
 		}
 	}
+    //var sq []SiteQuestions
+	//sq  = append(sq,SiteQuestions {Site:"careercup",QuestionEntrySet:questionArray})
+	//compQuestions = CompanyQuestions{Company : companyName,SiteQuestionsSet : sq}
+	//return compQuestions
+	return questionArray
 }
 
+//func getQuestions(company string, )
+
 func main() {
-	getJSON("https://www.careercup.com/page?pid=facebook-interview-questions&n=2")
+	var cmpqs []CompanyQuestions
+	var stqs []SiteQuestions
+	var qsarr []QuestionEntry
+	
+	for i := 1;i <= 14; i++ {
+		compq := getJSON("https://www.careercup.com", "google",strconv.Itoa(i))
+		qsarr = append(qsarr,compq...)
+		//cmpqs["google"] = append(cmpqs["google"],compq)
+	}
+	stqs = append(stqs, SiteQuestions{"careercup",qsarr})
+	cmpqs = append(cmpqs,CompanyQuestions{"google",stqs})
+	b, _ := json.MarshalIndent(cmpqs,"","  ")				
+	fmt.Println("\n" + string(b))
 }
