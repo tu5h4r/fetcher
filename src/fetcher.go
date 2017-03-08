@@ -232,7 +232,7 @@ func runFetcher(company string, sortorder string) []CompanyQuestions {
 }
 
 
-func sayhelloName(w http.ResponseWriter, r *http.Request) {
+func ReceiveHttpRequest(w http.ResponseWriter, r *http.Request) {
 	var htmlDATA string
 	r.ParseForm()       // parse arguments, you have to call this by yourself
 	fmt.Println(r.Form) // print form information in server side
@@ -247,7 +247,10 @@ func sayhelloName(w http.ResponseWriter, r *http.Request) {
 	htmlDATA = "<table><tr><td><select id =\"company\"><option value=amazon>Amazon</option>"
 	htmlDATA += "<option value=google>Google</option>"
 	htmlDATA += "<option value=facebook>Facebook</option>"
-	htmlDATA += "<option value=linkedin>LinkedIn</option></select></td>"
+	htmlDATA += "<option value=linkedin>LinkedIn</option>"
+	htmlDATA += "<option value=intel>Intel</option>"
+	htmlDATA += "<option value=apple>Apple</option>"
+	htmlDATA += "<option value=vmware-inc>VMWare Inc</option></select></td>"
 	
 	htmlDATA += "<td><select id =\"sorted\"><option value=date>Sort By Date</option>"
 	htmlDATA += "<option value=comments>Sort By Comments</option>"
@@ -285,7 +288,7 @@ func sayhelloName(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	http.HandleFunc("/", sayhelloName)       // set router
+	http.HandleFunc("/", ReceiveHttpRequest)       // set router
 	err := http.ListenAndServe(":9090", nil) // set listen port
 	if err != nil {
 		log.Fatal("ListenAndServe: ", err)
