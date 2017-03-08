@@ -39,18 +39,23 @@ type resultSet struct{
 	QuestionEntrySet []QuestionEntry
 }
 
-var myClient = &http.Client{Timeout: 50 * time.Second}
+var myClient = &http.Client{Timeout: 4 * time.Second}
 
 //Make a generic parseBlock function where you pass *html.Tokenizer and a JSON with HTML block structure, tokenizer is passed as reference
 
 func getPageResult(url string,companyName string, pageID int, chFinished chan bool,  ret chan resultSet)  {
 
 	link := "https://www.careercup.com/page?pid=" + companyName + "-interview-questions&n=" + strconv.Itoa(pageID)
-	//fmt.Println(link)
 	resp, err := myClient.Get(link)
-	if err != nil {
-		log.Fatal(err)
-		return //nil
+	for err != nil {
+		strError := err.Error()
+		if( strings.Contains(strError,"Client.Timeout exceeded")){
+			fmt.Println("Connection Timed Out - " + strError+"\nRetrying...")
+			resp, err = myClient.Get(link)
+		}else{
+			log.Fatal(err)
+			return //nil
+		}
 	}
 
 	defer func() {
@@ -203,15 +208,15 @@ func runFetcher(company string, sortorder string) []CompanyQuestions {
 	var stqs []SiteQuestions
 	
 	var qsarr []resultSet
-	qsarr = make([]resultSet,14)
+	qsarr = make([]resultSet,50)
 	compq := make(chan resultSet)
 	chFinished := make(chan bool)	
 
-	for i := 1;i <= 14; i++ {  
+	for i := 1;i <= 50; i++ {  
 		go getPageResult("https://www.careercup.com", company,i,chFinished,compq)		
 	}
 
-	for c := 1; c <= 14; {
+	for c := 1; c <= 50; {
 		select {
 		case ret := <-compq:
 			qsarr[ret.ResultPageId-1] = ret
