@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 	"golang.org/x/net/html"
-	"encoding/json"
+	//"encoding/json"
 	"strconv"
 )
 
@@ -19,8 +19,6 @@ type QuestionEntry struct {
 	URL string
 	Date string
     Question string
-	//Company string
-	//Site string
 }
 
 //Per site collection of questions for a given company
@@ -36,14 +34,18 @@ type CompanyQuestions struct {
 }
 
 
-var myClient = &http.Client{Timeout: 100 * time.Second}
+type resultSet struct{
+	QuestionEntrySet []QuestionEntry
+}
+
+var myClient = &http.Client{Timeout: 20 * time.Second}
 
 //Make a generic parseBlock function where you pass *html.Tokenizer and a JSON with HTML block structure, tokenizer is passed as reference
 
 func getJSON(url string,companyName string, pageID string, chFinished chan bool,  ret chan []QuestionEntry)  {
 
 	link := "https://www.careercup.com/page?pid=" + companyName + "-interview-questions&n=" + pageID
-	fmt.Println(link)
+	//fmt.Println(link)
 	resp, err := myClient.Get(link)
 	if err != nil {
 		log.Fatal(err)
@@ -111,6 +113,7 @@ func getJSON(url string,companyName string, pageID string, chFinished chan bool,
 			if t.Data == "a" && recordSpanEntry == true {
 				for _, a := range t.Attr {
 					if a.Key == "href" && strings.HasPrefix(a.Val, "/question?id=") {
+						
 						recordahref = true
 						qEntry.URL = strings.Split(url, ".com")[0] + ".com" + a.Val
 						qEntry.ID = strings.TrimLeft(a.Val, "/question?id=")
@@ -149,6 +152,9 @@ func getJSON(url string,companyName string, pageID string, chFinished chan bool,
 		case tokenType == html.TextToken:
 			t := doc.Token()
 			if readquestion == true || recordCode == true {
+				if strings.Contains(t.Data,"<"){
+					t.Data = strings.Replace(t.Data, "<", "< ", -1)
+				}
 				questionText += t.Data
 				break
 			}
@@ -189,7 +195,7 @@ func getJSON(url string,companyName string, pageID string, chFinished chan bool,
 	ret <- questionArray
 }
 
-func main() {
+func main_dummy() []CompanyQuestions {
 	var cmpqs []CompanyQuestions
 	var stqs []SiteQuestions
 	var qsarr []QuestionEntry
@@ -211,7 +217,52 @@ func main() {
 	
 	stqs = append(stqs, SiteQuestions{"careercup",qsarr})
 	cmpqs = append(cmpqs,CompanyQuestions{"google",stqs})
-	b, _ := json.MarshalIndent(cmpqs,"","  ")		
+	return cmpqs
+}
 
-	fmt.Println("\n" + string(b))
+
+func sayhelloName(w http.ResponseWriter, r *http.Request) {
+	var htmlDATA string
+	r.ParseForm()       // parse arguments, you have to call this by yourself
+	fmt.Println(r.Form) // print form information in server side
+	fmt.Println("path", r.URL.Path)
+	fmt.Println("scheme", r.URL.Scheme)
+	fmt.Println(r.Form["url_long"])
+	for k, v := range r.Form {
+		fmt.Println("key:", k)
+		fmt.Println("val:", strings.Join(v, ""))
+	}
+
+	//htmlDATA = "<select><option value=\"volvo\">Volvo</option>\n<option value=\"saab\">Saab</option>\n<option value=\"opel\">Opel</option>\n"
+  	//htmlDATA +=  "<option value=\"audi\">Audi</option>\n</select>\n";
+	
+
+	var st []CompanyQuestions 
+	st = main_dummy()
+	htmlDATA = "<table><tr><td><select><option value=amazon>Amazon</option>"
+	htmlDATA += "<option value=google>Google</option>"
+	htmlDATA += "<option value=facebook>Facebook</option>"
+	htmlDATA += "<option value=linkedin>LinkedIn</option></select></td></tr></table>"
+	htmlDATA += "<table border=\"1\" width=\"100%\" style= \"table-layout: fixed\">\n"
+	for _, elem := range st[0].SiteQuestionsSet[0].QuestionEntrySet {
+		htmlDATA += "<tr><td><table>\n"
+		htmlDATA += "<tr><td><pre style=\"white-space: pre-wrap;word-wrap: break-word\">\n"+ elem.Question + "\n</pre>\n</td></tr>"
+		htmlDATA += "<tr><td style=\"font-family:verdana;font-size:12 \">URL - <a href=\"" + elem.URL + "\" rel=\"noopener noreferrer\" target=\"_blank\">" + elem.URL +"</a></td></tr>\n"
+		htmlDATA += "<tr><td style=\"font-family:verdana;font-size:12 \">Date - " + elem.Date + "</td></tr>\n"
+		htmlDATA += "<tr><td style=\"font-family:verdana;font-size:12 \">Comments - " + elem.Comments + "</td></tr>\n"
+		htmlDATA += "<tr><td style=\"font-family:verdana;font-size:12 \">Votes - " + elem.Votes + "</td></tr>\n"
+		htmlDATA += "</table></td></tr>\n"
+	}
+	htmlDATA += "</table>"
+	
+	
+	fmt.Fprintln(w,htmlDATA)
+}
+
+func main() {
+	http.HandleFunc("/", sayhelloName)       // set router
+	err := http.ListenAndServe(":9090", nil) // set listen port
+	if err != nil {
+		log.Fatal("ListenAndServe: ", err)
+	}
 }
