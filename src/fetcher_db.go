@@ -59,8 +59,11 @@ func UpdateDB(url string,companyName string, pageID int) (bool) {
 			fmt.Println("Connection Timed Out - " + strError+"\nRetrying...")
 			resp, err = myClient.Get(link)
 		}else{
+			if( strings.Contains(strError,"no such host")){
+				return true 
+			}
 			log.Fatal(err)
-			return true //nil
+			//nil
 		}
 	}
 
