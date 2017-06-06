@@ -1,3 +1,10 @@
+
+//============================================================================
+// Name        : fetcher.gp
+// Author      :  Tushar Singh
+// Description : Non DB solution for fetcher parser and web scrapper
+//============================================================================
+
 package main
 
 import (
